@@ -8,6 +8,7 @@ import android.widget.AutoCompleteTextView
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
+import android.widget.Filter
 import android.widget.ListView
 import android.widget.TextView
 import android.widget.Toast
@@ -24,7 +25,7 @@ class FolderActivity : AppCompatActivity() {
     private lateinit var adapter: ArrayAdapter<String>
 
     private val suggestionList = mutableListOf<String>()
-    private lateinit var suggestionAdapter: ArrayAdapter<String>
+    private lateinit var suggestionAdapter: AutoCompleteAdapter
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -51,7 +52,7 @@ class FolderActivity : AppCompatActivity() {
         adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, entryDisplayList)
         listViewEntries.adapter = adapter
 
-        suggestionAdapter = ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, suggestionList)
+        suggestionAdapter = AutoCompleteAdapter(this, android.R.layout.simple_dropdown_item_1line, suggestionList)
         inputEntryName.setAdapter(suggestionAdapter)
 
         loadEntriesFromDatabase()
@@ -65,13 +66,12 @@ class FolderActivity : AppCompatActivity() {
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
                 val query = s?.toString() ?: ""
                 if (query.length >= 2) {
-                    MediaApiHelper.searchSuggestions(folderName, query) { suggestions ->
-                        suggestionList.clear()
-                        suggestionList.addAll(suggestions)
-                        suggestionAdapter.notifyDataSetChanged()
-                        if (suggestions.isNotEmpty() && inputEntryName.hasFocus()) {
-                            inputEntryName.showDropDown()
-                        }
+                    val suggestions = dbHelper.searchCatalog(folderName, query)
+                    suggestionList.clear()
+                    suggestionList.addAll(suggestions)
+                    suggestionAdapter.notifyDataSetChanged()
+                    if (suggestions.isNotEmpty() && inputEntryName.hasFocus()) {
+                        inputEntryName.showDropDown()
                     }
                 }
             }
@@ -184,5 +184,27 @@ class FolderActivity : AppCompatActivity() {
             }
             .setNegativeButton("Cancel", null)
             .show()
+    }
+}
+
+class AutoCompleteAdapter(context: Context, resource: Int, private val objects: MutableList<String>) :
+    ArrayAdapter<String>(context, resource, objects) {
+
+    override fun getFilter(): Filter {
+        return object : Filter() {
+            override fun performFiltering(constraint: CharSequence?): FilterResults {
+                val results = FilterResults()
+                results.values = objects
+                results.count = objects.size
+                return results
+            }
+            override fun publishResults(constraint: CharSequence?, results: FilterResults?) {
+                if (results != null && results.count > 0) {
+                    notifyDataSetChanged()
+                } else {
+                    notifyDataSetInvalidated()
+                }
+            }
+        }
     }
 }

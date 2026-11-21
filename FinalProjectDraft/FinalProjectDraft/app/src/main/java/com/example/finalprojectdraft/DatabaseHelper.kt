@@ -12,12 +12,13 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
 
     companion object {
         private const val DATABASE_NAME = "media_vault.db"
-        private const val DATABASE_VERSION = 1
+        private const val DATABASE_VERSION = 2
 
         const val TABLE_USERS = "USERS"
         const val TABLE_CATEGORIES = "CATEGORIES"
         const val TABLE_ENTRIES = "ENTRIES"
         const val TABLE_ENTRY_CATEGORIES = "ENTRY_CATEGORIES"
+        const val TABLE_MEDIA_CATALOG = "MEDIA_CATALOG"
     }
 
     override fun onCreate(db: SQLiteDatabase) {
@@ -65,10 +66,19 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
             );
         """.trimIndent()
 
+        val createCatalogTable = """
+            CREATE TABLE IF NOT EXISTS $TABLE_MEDIA_CATALOG (
+                ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                Category TEXT NOT NULL,
+                Title TEXT NOT NULL
+            );
+        """.trimIndent()
+
         db.execSQL(createUsersTable)
         db.execSQL(createCategoriesTable)
         db.execSQL(createEntriesTable)
         db.execSQL(createEntryCategoriesTable)
+        db.execSQL(createCatalogTable)
 
         val userValues = ContentValues().apply {
             put("Username", "default_user")
@@ -85,6 +95,60 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
             }
             db.insert(TABLE_CATEGORIES, null, catValues)
         }
+
+        seedCatalogData(db)
+    }
+
+    private fun seedCatalogData(db: SQLiteDatabase) {
+        val catalogItems = listOf(
+            Pair("Anime", "Naruto"),
+            Pair("Anime", "Naruto Shippuden"),
+            Pair("Anime", "Attack on Titan"),
+            Pair("Anime", "Demon Slayer"),
+            Pair("Anime", "One Piece"),
+            Pair("Anime", "Jujutsu Kaisen"),
+            Pair("Anime", "My Hero Academia"),
+            Pair("Anime", "Death Note"),
+            Pair("Anime", "Fullmetal Alchemist: Brotherhood"),
+            Pair("Anime", "Bleach"),
+            Pair("Movie", "Dune: Part Two"),
+            Pair("Movie", "Interstellar"),
+            Pair("Movie", "Inception"),
+            Pair("Movie", "The Dark Knight"),
+            Pair("Movie", "Avengers: Endgame"),
+            Pair("Movie", "Spirited Away"),
+            Pair("Movie", "Spider-Man: Across the Spider-Verse"),
+            Pair("Movie", "Titanic"),
+            Pair("TV Series", "Breaking Bad"),
+            Pair("TV Series", "Game of Thrones"),
+            Pair("TV Series", "Stranger Things"),
+            Pair("TV Series", "Succession"),
+            Pair("TV Series", "The Last of Us"),
+            Pair("TV Series", "The Office"),
+            Pair("TV Series", "Chernobyl"),
+            Pair("TV Series", "Better Call Saul"),
+            Pair("Manga", "Chainsaw Man"),
+            Pair("Manga", "Berserk"),
+            Pair("Manga", "Vagabond"),
+            Pair("Manga", "Tokyo Revengers"),
+            Pair("Manga", "One-Punch Man"),
+            Pair("Manga", "Spy x Family"),
+            Pair("Manga", "Jujutsu Kaisen"),
+            Pair("Book", "The Way of Kings"),
+            Pair("Book", "The Hobbit"),
+            Pair("Book", "Harry Potter"),
+            Pair("Book", "1984"),
+            Pair("Book", "To Kill a Mockingbird"),
+            Pair("Book", "Atomic Habits"),
+            Pair("Book", "The Alchemist")
+        )
+        for (item in catalogItems) {
+            val cv = ContentValues().apply {
+                put("Category", item.first)
+                put("Title", item.second)
+            }
+            db.insert(TABLE_MEDIA_CATALOG, null, cv)
+        }
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
@@ -92,6 +156,7 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         db.execSQL("DROP TABLE IF EXISTS $TABLE_ENTRIES")
         db.execSQL("DROP TABLE IF EXISTS $TABLE_CATEGORIES")
         db.execSQL("DROP TABLE IF EXISTS $TABLE_USERS")
+        db.execSQL("DROP TABLE IF EXISTS $TABLE_MEDIA_CATALOG")
         onCreate(db)
     }
 
@@ -237,11 +302,10 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
 
     fun registerUser(username: String, password: String): Long {
         val db = writableDatabase
-        // Check if username exists
         val cursor = db.rawQuery("SELECT User_ID FROM $TABLE_USERS WHERE Username = ?", arrayOf(username))
         if (cursor.moveToFirst()) {
             cursor.close()
-            return -1L // Username already taken
+            return -1L
         }
         cursor.close()
 
@@ -251,7 +315,6 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         }
         val userId = db.insert(TABLE_USERS, null, values)
         if (userId != -1L) {
-            // Seed default categories for new user
             val defaultCategories = listOf("Anime", "TV Series", "Manga", "Book", "Movie")
             for (cat in defaultCategories) {
                 val catValues = ContentValues().apply {
@@ -342,5 +405,21 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         }
         val rows = db.update(TABLE_ENTRIES, values, "Entry_ID = ?", arrayOf(entryId.toString()))
         return rows > 0
+    }
+
+    fun searchCatalog(categoryName: String, query: String): List<String> {
+        val list = mutableListOf<String>()
+        val db = readableDatabase
+        val cursor = db.rawQuery(
+            "SELECT Title FROM $TABLE_MEDIA_CATALOG WHERE Category LIKE ? AND Title LIKE ? LIMIT 10",
+            arrayOf("%$categoryName%", "%$query%")
+        )
+        if (cursor.moveToFirst()) {
+            do {
+                list.add(cursor.getString(0))
+            } while (cursor.moveToNext())
+        }
+        cursor.close()
+        return list
     }
 }
