@@ -26,7 +26,11 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         dbHelper = DatabaseHelper(this)
-        currentUserId = dbHelper.getDefaultUserId()
+        val sharedPreferences = getSharedPreferences("app_session", Context.MODE_PRIVATE)
+        currentUserId = sharedPreferences.getInt("logged_in_user_id", -1)
+        if (currentUserId == -1) {
+            currentUserId = dbHelper.getDefaultUserId()
+        }
 
         val gridView = findViewById<GridView>(R.id.gridViewFolders)
         val btnAddFolder = findViewById<Button>(R.id.btnAddFolder)
@@ -57,6 +61,21 @@ class MainActivity : AppCompatActivity() {
                 putExtra("FOLDER_NAME", selectedCategory.name)
             }
             startActivity(intent)
+        }
+
+        gridView.setOnItemLongClickListener { _, _, position, _ ->
+            val category = categoryList[position]
+            val options = arrayOf("Rename Category", "Delete Category")
+            AlertDialog.Builder(this)
+                .setTitle(category.name)
+                .setItems(options) { _, which ->
+                    when (which) {
+                        0 -> showRenameCategoryDialog(category)
+                        1 -> showDeleteCategoryConfirmation(category)
+                    }
+                }
+                .show()
+            true
         }
     }
 
@@ -91,6 +110,35 @@ class MainActivity : AppCompatActivity() {
         }
         builder.setNegativeButton("Cancel") { dialog, _ -> dialog.cancel() }
         builder.show()
+    }
+
+    private fun showRenameCategoryDialog(category: CategoryItem) {
+        val builder = AlertDialog.Builder(this)
+        builder.setTitle("Rename Category")
+        val input = EditText(this)
+        input.setText(category.name)
+        builder.setView(input)
+        builder.setPositiveButton("Save") { _, _ ->
+            val newName = input.text.toString().trim()
+            if (newName.isNotEmpty()) {
+                dbHelper.updateCategoryName(category.id, newName)
+                loadCategoriesFromDatabase()
+            }
+        }
+        builder.setNegativeButton("Cancel", null)
+        builder.show()
+    }
+
+    private fun showDeleteCategoryConfirmation(category: CategoryItem) {
+        AlertDialog.Builder(this)
+            .setTitle("Delete Category")
+            .setMessage("Are you sure you want to delete '${category.name}' and all its entries?")
+            .setPositiveButton("Delete") { _, _ ->
+                dbHelper.deleteCategory(category.id)
+                loadCategoriesFromDatabase()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 }
 

@@ -234,4 +234,113 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         val rows = db.delete(TABLE_ENTRIES, "User_ID = ?", arrayOf(userId.toString()))
         return rows >= 0
     }
+
+    fun registerUser(username: String, password: String): Long {
+        val db = writableDatabase
+        // Check if username exists
+        val cursor = db.rawQuery("SELECT User_ID FROM $TABLE_USERS WHERE Username = ?", arrayOf(username))
+        if (cursor.moveToFirst()) {
+            cursor.close()
+            return -1L // Username already taken
+        }
+        cursor.close()
+
+        val values = ContentValues().apply {
+            put("Username", username)
+            put("Password", password)
+        }
+        val userId = db.insert(TABLE_USERS, null, values)
+        if (userId != -1L) {
+            // Seed default categories for new user
+            val defaultCategories = listOf("Anime", "TV Series", "Manga", "Book", "Movie")
+            for (cat in defaultCategories) {
+                val catValues = ContentValues().apply {
+                    put("Category_Name", cat)
+                    put("User_ID", userId.toInt())
+                }
+                db.insert(TABLE_CATEGORIES, null, catValues)
+            }
+        }
+        return userId
+    }
+
+    fun loginUser(username: String, password: String): Int {
+        val db = readableDatabase
+        val cursor = db.rawQuery("SELECT User_ID FROM $TABLE_USERS WHERE Username = ? AND Password = ?", arrayOf(username, password))
+        var userId = -1
+        if (cursor.moveToFirst()) {
+            userId = cursor.getInt(cursor.getColumnIndexOrThrow("User_ID"))
+        }
+        cursor.close()
+        return userId
+    }
+
+    fun updatePassword(userId: Int, newPassword: String): Boolean {
+        val db = writableDatabase
+        val values = ContentValues().apply {
+            put("Password", newPassword)
+        }
+        val rows = db.update(TABLE_USERS, values, "User_ID = ?", arrayOf(userId.toString()))
+        return rows > 0
+    }
+
+    fun getOrCreateGuestUserId(): Int {
+        val db = writableDatabase
+        val cursor = db.rawQuery("SELECT User_ID FROM $TABLE_USERS WHERE Username = ?", arrayOf("Guest"))
+        var guestId = -1
+        if (cursor.moveToFirst()) {
+            guestId = cursor.getInt(cursor.getColumnIndexOrThrow("User_ID"))
+        }
+        cursor.close()
+
+        if (guestId == -1) {
+            val values = ContentValues().apply {
+                put("Username", "Guest")
+                put("Password", "guest_pass")
+            }
+            val newId = db.insert(TABLE_USERS, null, values)
+            guestId = newId.toInt()
+            if (guestId != -1) {
+                val defaultCategories = listOf("Anime", "TV Series", "Manga", "Book", "Movie")
+                for (cat in defaultCategories) {
+                    val catValues = ContentValues().apply {
+                        put("Category_Name", cat)
+                        put("User_ID", guestId)
+                    }
+                    db.insert(TABLE_CATEGORIES, null, catValues)
+                }
+            }
+        }
+        return guestId
+    }
+
+    fun deleteCategory(categoryId: Int): Boolean {
+        val db = writableDatabase
+        val rows = db.delete(TABLE_CATEGORIES, "Category_ID = ?", arrayOf(categoryId.toString()))
+        return rows > 0
+    }
+
+    fun updateCategoryName(categoryId: Int, newName: String): Boolean {
+        val db = writableDatabase
+        val values = ContentValues().apply {
+            put("Category_Name", newName)
+        }
+        val rows = db.update(TABLE_CATEGORIES, values, "Category_ID = ?", arrayOf(categoryId.toString()))
+        return rows > 0
+    }
+
+    fun deleteEntry(entryId: Int): Boolean {
+        val db = writableDatabase
+        val rows = db.delete(TABLE_ENTRIES, "Entry_ID = ?", arrayOf(entryId.toString()))
+        return rows > 0
+    }
+
+    fun updateEntry(entryId: Int, newTitle: String): Boolean {
+        val db = writableDatabase
+        val values = ContentValues().apply {
+            put("Entry_Title", newTitle)
+        }
+        val rows = db.update(TABLE_ENTRIES, values, "Entry_ID = ?", arrayOf(entryId.toString()))
+        return rows > 0
+    }
 }

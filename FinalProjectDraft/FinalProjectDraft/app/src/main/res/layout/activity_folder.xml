@@ -37,7 +37,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:layout_marginBottom="16dp">
+        android:layout_marginBottom="12dp">
 
         <AutoCompleteTextView
             android:id="@+id/inputEntryName"
@@ -53,6 +53,15 @@
             android:layout_height="wrap_content"
             android:text="Add" />
     </LinearLayout>
+
+    <EditText
+        android:id="@+id/inputSearchEntries"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="🔍 Filter entries in this folder..."
+        android:textSize="14sp"
+        android:layout_marginBottom="12dp"
+        android:padding="12dp" />
 
     <ListView
         android:id="@+id/listViewEntries"
